@@ -20,9 +20,10 @@ except ImportError:
         pass
 
 try:
-    import openai
+    from openai import OpenAI
+    openai_available = True
 except ImportError:
-    openai = None
+    openai_available = False
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -154,7 +155,7 @@ class DocumentationGenerator:
         self.llm_calls_made = 0
         
         # Check if OpenAI is available
-        if openai is None:
+        if not openai_available:
             raise ImportError("OpenAI library is not installed. Please install it with: pip install openai")
         
         # Validate OpenAI API key
@@ -162,7 +163,8 @@ class DocumentationGenerator:
         if not api_key:
             raise ValueError("OPENAI_API_KEY environment variable is required")
         
-        openai.api_key = api_key
+        # Initialize OpenAI client
+        self.client = OpenAI(api_key=api_key)
         self.model = os.getenv('OPENAI_MODEL', 'gpt-4')
     
     def generate_readme(self, analysis: Dict[str, Any]) -> None:
@@ -213,7 +215,7 @@ class DocumentationGenerator:
             raise ValueError("Maximum LLM calls reached")
         
         try:
-            response = openai.ChatCompletion.create(
+            response = self.client.chat.completions.create(
                 model=self.model,
                 messages=[
                     {"role": "system", "content": system_prompt},

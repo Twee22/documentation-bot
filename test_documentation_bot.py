@@ -129,40 +129,71 @@ class TestDocumentationGenerator(unittest.TestCase):
         self.temp_dir = tempfile.mkdtemp()
         self.repo_path = Path(self.temp_dir) / "test_repo"
         self.repo_path.mkdir()
-        self.generator = DocumentationGenerator(
-            repo_path=self.repo_path,
-            detail_level="medium",
-            max_llm_calls=10
-        )
+        
+        # Mock environment variables for testing
+        with patch.dict(os.environ, {'OPENAI_API_KEY': 'test-key'}):
+            self.generator = DocumentationGenerator(
+                repo_path=self.repo_path,
+                detail_level="medium",
+                max_llm_calls=10
+            )
         
     def tearDown(self):
         """Clean up test environment."""
         shutil.rmtree(self.temp_dir)
     
-    @patch('documentation_bot.openai.ChatCompletion.create')
-    def test_generate_readme(self, mock_openai):
+    @patch('documentation_bot.openai_available', True)
+    @patch('documentation_bot.OpenAI')
+    def test_generate_readme(self, mock_openai_class):
         """Test generating a README.md file."""
-        mock_openai.return_value.choices[0].message.content = "# Test README\n\nThis is a test."
+        # Mock the OpenAI client
+        mock_client = MagicMock()
+        mock_openai_class.return_value = mock_client
+        
+        # Mock the response
+        mock_response = MagicMock()
+        mock_response.choices[0].message.content = "# Test README\n\nThis is a test."
+        mock_client.chat.completions.create.return_value = mock_response
         
         # Create some files to analyze
         (self.repo_path / "main.py").write_text("print('Hello')")
         
-        self.generator.generate_readme()
+        with patch.dict(os.environ, {'OPENAI_API_KEY': 'test-key'}):
+            generator = DocumentationGenerator(
+                repo_path=self.repo_path,
+                detail_level="medium",
+                max_llm_calls=10
+            )
+            generator.generate_readme({'structure': ['main.py']})
         
         readme_path = self.repo_path / "README.md"
         self.assertTrue(readme_path.exists())
         self.assertIn("Test README", readme_path.read_text())
     
-    @patch('documentation_bot.openai.ChatCompletion.create')
-    def test_generate_documentation_files(self, mock_openai):
+    @patch('documentation_bot.openai_available', True)
+    @patch('documentation_bot.OpenAI')
+    def test_generate_documentation_files(self, mock_openai_class):
         """Test generating documentation files in /docs directory."""
-        mock_openai.return_value.choices[0].message.content = "# API Documentation\n\nTest content."
+        # Mock the OpenAI client
+        mock_client = MagicMock()
+        mock_openai_class.return_value = mock_client
+        
+        # Mock the response
+        mock_response = MagicMock()
+        mock_response.choices[0].message.content = "# API Documentation\n\nTest content."
+        mock_client.chat.completions.create.return_value = mock_response
         
         # Create some files to analyze
         (self.repo_path / "app.py").write_text("from flask import Flask")
         (self.repo_path / "models.py").write_text("class User: pass")
         
-        self.generator.generate_documentation_files()
+        with patch.dict(os.environ, {'OPENAI_API_KEY': 'test-key'}):
+            generator = DocumentationGenerator(
+                repo_path=self.repo_path,
+                detail_level="medium",
+                max_llm_calls=10
+            )
+            generator.generate_documentation_files({'structure': ['app.py', 'models.py']})
         
         docs_path = self.repo_path / "docs"
         self.assertTrue(docs_path.exists())
@@ -171,31 +202,33 @@ class TestDocumentationGenerator(unittest.TestCase):
     def test_different_detail_levels(self):
         """Test that different detail levels affect documentation generation."""
         # Test high detail level
-        high_generator = DocumentationGenerator(
-            repo_path=self.repo_path,
-            detail_level="high",
-            max_llm_calls=10
-        )
-        self.assertEqual(high_generator.detail_level, "high")
-        
-        # Test low detail level
-        low_generator = DocumentationGenerator(
-            repo_path=self.repo_path,
-            detail_level="low",
-            max_llm_calls=10
-        )
-        self.assertEqual(low_generator.detail_level, "low")
+        with patch.dict(os.environ, {'OPENAI_API_KEY': 'test-key'}):
+            high_generator = DocumentationGenerator(
+                repo_path=self.repo_path,
+                detail_level="high",
+                max_llm_calls=10
+            )
+            self.assertEqual(high_generator.detail_level, "high")
+            
+            # Test low detail level
+            low_generator = DocumentationGenerator(
+                repo_path=self.repo_path,
+                detail_level="low",
+                max_llm_calls=10
+            )
+            self.assertEqual(low_generator.detail_level, "low")
     
     def test_llm_call_counting(self):
         """Test that LLM calls are properly counted and limited."""
-        generator = DocumentationGenerator(
-            repo_path=self.repo_path,
-            detail_level="medium",
-            max_llm_calls=2
-        )
-        
-        self.assertEqual(generator.llm_calls_made, 0)
-        self.assertEqual(generator.max_llm_calls, 2)
+        with patch.dict(os.environ, {'OPENAI_API_KEY': 'test-key'}):
+            generator = DocumentationGenerator(
+                repo_path=self.repo_path,
+                detail_level="medium",
+                max_llm_calls=2
+            )
+            
+            self.assertEqual(generator.llm_calls_made, 0)
+            self.assertEqual(generator.max_llm_calls, 2)
 
 
 class TestMainCLI(unittest.TestCase):
